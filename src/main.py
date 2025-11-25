@@ -1,11 +1,15 @@
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from src.database import Base, engine
+from src.router import tenant
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CTMS API", version="1.0.0")
+
+# Include routers
+app.include_router(tenant.router)
 
 
 @app.get("/")
