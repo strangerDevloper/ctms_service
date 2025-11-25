@@ -64,3 +64,27 @@ class TenantResponse(TenantInDB):
     """Schema for tenant API response."""
     pass
 
+
+class TenantListResponse(BaseModel):
+    """Simplified schema for tenant list response with only essential fields."""
+    id: int
+    name: str
+    tenant_code: str
+    status: TenantStatus
+    
+    class Config:
+        from_attributes = True
+
+
+class TenantQueryParams(BaseModel):
+    """Query parameters schema for filtering and paginating tenants."""
+    skip: int = Field(default=0, ge=0, description="Number of records to skip")
+    limit: int = Field(default=100, ge=1, le=1000, description="Maximum number of records to return")
+    status: Optional[TenantStatus] = Field(default=None, description="Filter by tenant status")
+    search_id: Optional[int] = Field(default=None, description="Search by tenant ID")
+    search: Optional[str] = Field(default=None, description="Search by tenant name or code (case-insensitive partial match)")
+    include_deleted: bool = Field(default=False, description="Include soft-deleted tenants")
+    
+    class Config:
+        from_attributes = True
+

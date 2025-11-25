@@ -3,8 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.service.tenant import tenant_service
-from src.schema.tenant import TenantCreate, TenantUpdate, TenantResponse
-from src.models.tenants import TenantStatus
+from src.schema.tenant import (
+    TenantCreate,
+    TenantUpdate,
+    TenantResponse,
+    TenantListResponse,
+    TenantQueryParams
+)
 
 router = APIRouter(
     prefix="/tenant",
@@ -31,58 +36,28 @@ async def create_tenant(
 
 @router.get(
     "",
-    response_model=List[TenantResponse],
+    response_model=List[TenantListResponse],
     summary="Get all tenants",
-    description="Retrieve a list of tenants with pagination"
+    description="Retrieve a list of tenants with pagination and filters. Returns only id, name, tenant_code, and status."
 )
 async def get_tenants(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
-    include_deleted: bool = Query(False, description="Include soft-deleted tenants"),
+    query_params: TenantQueryParams = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all tenants with pagination."""
+    """
+    Get all tenants with pagination and filters.
+    
+    Query Parameters:
+    - skip: Number of records to skip (default: 0)
+    - limit: Maximum number of records to return (default: 100, max: 1000)
+    - status: Filter by tenant status (optional)
+    - search_id: Search by specific tenant ID (optional)
+    - search: Search by tenant name or code - case-insensitive partial match (optional)
+    - include_deleted: Include soft-deleted tenants (default: false)
+    """
     return await tenant_service.get_tenants(
         db=db,
-        skip=skip,
-        limit=limit,
-        include_deleted=include_deleted
-    )
-
-
-@router.get(
-    "/active",
-    response_model=List[TenantResponse],
-    summary="Get active tenants",
-    description="Retrieve a list of active tenants (not deleted and status is ACTIVE)"
-)
-async def get_active_tenants(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get all active tenants."""
-    return await tenant_service.get_active_tenants(db=db, skip=skip, limit=limit)
-
-
-@router.get(
-    "/status/{status}",
-    response_model=List[TenantResponse],
-    summary="Get tenants by status",
-    description="Retrieve tenants filtered by status"
-)
-async def get_tenants_by_status(
-    status: TenantStatus,
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get tenants by status."""
-    return await tenant_service.get_tenants_by_status(
-        db=db,
-        status=status,
-        skip=skip,
-        limit=limit
+        query_params=query_params
     )
 
 

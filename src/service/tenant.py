@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID, uuid4
 from src.crud.tenant import tenant as crud_tenant
 from src.models.tenants import Tenant, TenantStatus
-from src.schema.tenant import TenantCreate, TenantUpdate, TenantResponse
+from src.schema.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantQueryParams
 
 
 class TenantService:
@@ -44,27 +44,21 @@ class TenantService:
     @staticmethod
     async def get_tenants(
         db: AsyncSession,
-        skip: int = 0,
-        limit: int = 100,
-        include_deleted: bool = False
+        query_params: TenantQueryParams
     ) -> List[Tenant]:
         """
-        Get multiple tenants with pagination.
+        Get multiple tenants with pagination and filters.
         
         Args:
             db: Database session
-            skip: Number of records to skip
-            limit: Maximum number of records to return
-            include_deleted: Whether to include soft-deleted tenants
+            query_params: Query parameters object containing filters and pagination
             
         Returns:
             List of Tenant objects
         """
         return await crud_tenant.get_multi(
             db=db,
-            skip=skip,
-            limit=limit,
-            include_deleted=include_deleted
+            query_params=query_params
         )
     
     @staticmethod

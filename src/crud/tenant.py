@@ -1,9 +1,9 @@
 from typing import List, Optional
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.crud.base import CRUDBase
 from src.models.tenants import Tenant, TenantStatus
-from src.schema.tenant import TenantCreate, TenantUpdate
+from src.schema.tenant import TenantCreate, TenantUpdate, TenantQueryParams
 
 
 class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
@@ -67,25 +67,45 @@ class CRUDTenant(CRUDBase[Tenant, TenantCreate, TenantUpdate]):
         self,
         db: AsyncSession,
         *,
-        skip: int = 0,
-        limit: int = 100,
-        include_deleted: bool = False
+        query_params: TenantQueryParams
     ) -> List[Tenant]:
         """
-        Get multiple tenants with pagination.
+        Get multiple tenants with pagination and filters.
         
         Args:
             db: Database session
-            skip: Number of records to skip
-            limit: Maximum number of records to return
-            include_deleted: Whether to include soft-deleted tenants
+            query_params: Query parameters object containing filters and pagination
+            
+        Returns:
+            List of Tenant objects
         """
         query = select(Tenant)
         
-        if not include_deleted:
+        # Filter by deleted status
+        if not query_params.include_deleted:
             query = query.filter(Tenant.is_deleted == False)
         
-        query = query.offset(skip).limit(limit)
+        # Filter by status
+        if query_params.status is not None:
+            query = query.filter(Tenant.status == query_params.status)
+        
+        # Filter by ID
+        if query_params.search_id is not None:
+            query = query.filter(Tenant.id == query_params.search_id)
+        
+        # Search by name or code (case-insensitive partial match)
+        if query_params.search:
+            search_pattern = f"%{query_params.search}%"
+            query = query.filter(
+                or_(
+                    Tenant.name.ilike(search_pattern),
+                    Tenant.tenant_code.ilike(search_pattern)
+                )
+            )
+        
+        # Apply pagination
+        query = query.offset(query_params.skip).limit(query_params.limit)
+        
         result = await db.execute(query)
         return list(result.scalars().all())
 
