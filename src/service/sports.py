@@ -2,8 +2,10 @@ from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.crud.sports import sport as crud_sport
+from src.crud.sports_config import sport_config as crud_sport_config
 from src.models.sports import Sport, SportStatus, SportCategory
-from src.schema.sports import SportCreate, SportUpdate, SportListResponse, SportQueryParams
+from src.schema.sports import SportCreate, SportUpdate, SportListResponse, SportQueryParams, SportResponse
+from src.schema.sports_config import SportConfigResponse
 from src.utils.response import PaginatedData
 
 
@@ -14,16 +16,17 @@ class SportService:
     """
     
     @staticmethod
-    async def get_sport(db: AsyncSession, sport_id: int) -> Sport:
+    async def get_sport(db: AsyncSession, sport_id: int, include_configs: bool = False) -> SportResponse:
         """
         Get a sport by ID.
         
         Args:
             db: Database session
             sport_id: Sport ID
+            include_configs: Whether to include configs in the response
             
         Returns:
-            Sport object
+            SportResponse object with optional configs
             
         Raises:
             HTTPException: If sport not found
@@ -39,7 +42,18 @@ class SportService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Sport with ID {sport_id} has been deleted"
             )
-        return sport_obj
+        
+        # Convert to response model
+        sport_response = SportResponse.model_validate(sport_obj)
+        
+        # Fetch configs if requested
+        if include_configs:
+            configs = await crud_sport_config.get_by_sport_id(db=db, sport_id=sport_id)
+            sport_response.configs = [SportConfigResponse.model_validate(config) for config in configs]
+        else:
+            sport_response.configs = None
+        
+        return sport_response
     
     @staticmethod
     async def get_sports(
