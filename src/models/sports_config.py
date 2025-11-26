@@ -6,13 +6,6 @@ from src.database import Base
 import enum
 
 
-class ConfigType(str, enum.Enum):
-    """Enum for config type"""
-    # Add your config types here
-    # Example: SETTINGS = "settings", RULES = "rules", etc.
-    pass
-
-
 class ConfigStatus(str, enum.Enum):
     """Enum for config status"""
     ACTIVE = "active"
@@ -28,7 +21,7 @@ class SportConfig(Base):
     Attributes:
         id: Primary key, auto-incrementing integer
         sport_id: Foreign key to sports table (INTEGER)
-        config_type: Type of configuration (ENUM)
+        config_type: Type of configuration (STRING)
         config_data: Configuration data (JSONB)
         status: Config status (ENUM)
         created_at: Timestamp when config was created
@@ -52,7 +45,7 @@ class SportConfig(Base):
         index=True
     )
     config_type = Column(
-        PG_ENUM(ConfigType, name="config_type", create_type=False),
+        String,
         nullable=False
     )
     config_data = Column(JSONB)

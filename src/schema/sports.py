@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field, validator
 from src.models.sports import SportCategory, SportStatus
+from src.schema.sports_config import SportConfigResponse
 
 
 class SportBase(BaseModel):
@@ -58,7 +59,10 @@ class SportInDB(SportBase):
 
 class SportResponse(SportInDB):
     """Schema for sport API response."""
-    pass
+    configs: Optional[List[SportConfigResponse]] = Field(None, description="List of sport configs (optional)")
+    
+    class Config:
+        from_attributes = True
 
 
 class SportListResponse(BaseModel):
