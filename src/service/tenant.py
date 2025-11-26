@@ -1,10 +1,14 @@
 from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from uuid import UUID, uuid4
 from src.crud.tenant import tenant as crud_tenant
+from src.crud.tenant_sports_mapping import tenant_sports_mapping as crud_mapping
 from src.models.tenants import Tenant, TenantStatus
 from src.schema.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantListResponse, TenantQueryParams
+from src.schema.tenant_sports_mapping import TenantSportsMappingResponse
 from src.utils.response import PaginatedData
 
 
@@ -15,16 +19,21 @@ class TenantService:
     """
     
     @staticmethod
-    async def get_tenant(db: AsyncSession, tenant_id: int) -> Tenant:
+    async def get_tenant(
+        db: AsyncSession,
+        tenant_id: int,
+        include_sports: bool = False
+    ) -> Tenant:
         """
         Get a tenant by ID.
         
         Args:
             db: Database session
             tenant_id: Tenant ID
+            include_sports: If True, include sports mappings in the response
             
         Returns:
-            Tenant object
+            Tenant object (with sports_mappings loaded if include_sports is True)
             
         Raises:
             HTTPException: If tenant not found
@@ -40,6 +49,17 @@ class TenantService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Tenant with ID {tenant_id} has been deleted"
             )
+        
+        # If include_sports is True, load the sports mappings
+        if include_sports:
+            # Reload tenant with sports_mappings relationship
+            result = await db.execute(
+                select(Tenant)
+                .options(selectinload(Tenant.sports_mappings))
+                .filter(Tenant.id == tenant_id)
+            )
+            tenant_obj = result.scalar_one()
+        
         return tenant_obj
     
     @staticmethod
