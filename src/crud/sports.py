@@ -1,5 +1,5 @@
-from typing import List, Optional
-from sqlalchemy import select, or_
+from typing import List, Optional, Tuple
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.crud.base import CRUDBase
 from src.models.sports import Sport, SportStatus, SportCategory
@@ -80,7 +80,7 @@ class CRUDSport(CRUDBase[Sport, SportCreate, SportUpdate]):
         db: AsyncSession,
         *,
         query_params: SportQueryParams
-    ) -> List[Sport]:
+    ) -> Tuple[List[Sport], int]:
         """
         Get multiple sports with pagination and filters.
         
@@ -89,41 +89,71 @@ class CRUDSport(CRUDBase[Sport, SportCreate, SportUpdate]):
             query_params: Query parameters object containing filters and pagination
             
         Returns:
-            List of Sport objects
+            Tuple of (List of Sport objects, total count)
         """
-        query = select(Sport)
+        # Build base query for filtering
+        base_query = select(Sport)
         
         # Filter by deleted status
         if not query_params.include_deleted:
-            query = query.filter(Sport.is_deleted == False)
+            base_query = base_query.filter(Sport.is_deleted == False)
         
         # Filter by status
         if query_params.status is not None:
-            query = query.filter(Sport.status == query_params.status)
+            base_query = base_query.filter(Sport.status == query_params.status)
         
         # Filter by category
         if query_params.category is not None:
-            query = query.filter(Sport.category == query_params.category)
+            base_query = base_query.filter(Sport.category == query_params.category)
         
         # Filter by ID
         if query_params.search_id is not None:
-            query = query.filter(Sport.id == query_params.search_id)
+            base_query = base_query.filter(Sport.id == query_params.search_id)
         
         # Search by name or code (case-insensitive partial match)
         if query_params.search:
             search_pattern = f"%{query_params.search}%"
-            query = query.filter(
+            base_query = base_query.filter(
                 or_(
                     Sport.sport_name.ilike(search_pattern),
                     Sport.sport_code.ilike(search_pattern)
                 )
             )
         
-        # Apply pagination
-        query = query.offset(query_params.skip).limit(query_params.limit)
+        # Get total count (apply same filters but without pagination)
+        count_query = select(func.count(Sport.id))
         
+        # Apply same filters as base_query
+        if not query_params.include_deleted:
+            count_query = count_query.filter(Sport.is_deleted == False)
+        
+        if query_params.status is not None:
+            count_query = count_query.filter(Sport.status == query_params.status)
+        
+        if query_params.category is not None:
+            count_query = count_query.filter(Sport.category == query_params.category)
+        
+        if query_params.search_id is not None:
+            count_query = count_query.filter(Sport.id == query_params.search_id)
+        
+        if query_params.search:
+            search_pattern = f"%{query_params.search}%"
+            count_query = count_query.filter(
+                or_(
+                    Sport.sport_name.ilike(search_pattern),
+                    Sport.sport_code.ilike(search_pattern)
+                )
+            )
+        
+        count_result = await db.execute(count_query)
+        total_count = count_result.scalar_one()
+        
+        # Apply pagination to get items
+        query = base_query.offset(query_params.skip).limit(query_params.limit)
         result = await db.execute(query)
-        return list(result.scalars().all())
+        items = list(result.scalars().all())
+        
+        return items, total_count
 
 
 # Create an instance of CRUDSport

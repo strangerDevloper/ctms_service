@@ -3,7 +3,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.crud.sports import sport as crud_sport
 from src.models.sports import Sport, SportStatus, SportCategory
-from src.schema.sports import SportCreate, SportUpdate, SportQueryParams
+from src.schema.sports import SportCreate, SportUpdate, SportListResponse, SportQueryParams
+from src.utils.response import PaginatedData
 
 
 class SportService:
@@ -44,7 +45,7 @@ class SportService:
     async def get_sports(
         db: AsyncSession,
         query_params: SportQueryParams
-    ) -> List[Sport]:
+    ) -> PaginatedData[SportListResponse]:
         """
         Get multiple sports with pagination and filters.
         
@@ -53,11 +54,25 @@ class SportService:
             query_params: Query parameters object containing filters and pagination
             
         Returns:
-            List of Sport objects
+            PaginatedData containing list of SportListResponse objects, total count, and pagination info
         """
-        return await crud_sport.get_multi(
+        items, total_count = await crud_sport.get_multi(
             db=db,
             query_params=query_params
+        )
+        
+        # Convert SQLAlchemy models to Pydantic models
+        sport_list = [SportListResponse.model_validate(sport) for sport in items]
+        
+        # Calculate has_next_page
+        has_next_page = (query_params.skip + query_params.limit) < total_count
+        
+        return PaginatedData(
+            items=sport_list,
+            total_count=total_count,
+            has_next_page=has_next_page,
+            skip=query_params.skip,
+            limit=query_params.limit
         )
     
     @staticmethod
