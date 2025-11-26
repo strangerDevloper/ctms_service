@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.service.tenant import tenant_service
+from src.service.tenant_sports_mapping import tenant_sports_mapping_service
 from src.utils.response import FormatResponse, StandardResponse, PaginatedData
 from src.schema.tenant import (
     TenantCreate,
@@ -10,6 +11,12 @@ from src.schema.tenant import (
     TenantResponse,
     TenantListResponse,
     TenantQueryParams
+)
+from src.schema.tenant_sports_mapping import (
+    RegisterSportRequest,
+    BulkRegisterSportRequest,
+    TenantSportsMappingResponse,
+    TenantSportsMappingUpdate
 )
 
 router = APIRouter(
@@ -59,6 +66,7 @@ async def get_tenants(
     - search_id: Search by specific tenant ID (optional)
     - search: Search by tenant name or code - case-insensitive partial match (optional)
     - include_deleted: Include soft-deleted tenants (default: false)
+    - sports_id: Filter tenants by sport ID - only returns tenants that have this sport registered (optional)
     
     Returns:
     - items: List of tenant objects
@@ -81,14 +89,24 @@ async def get_tenants(
     "/{tenant_id}",
     response_model=StandardResponse[TenantResponse],
     summary="Get tenant by ID",
-    description="Retrieve a specific tenant by its ID"
+    description="Retrieve a specific tenant by its ID. Optionally include sports mappings."
 )
 async def get_tenant(
     tenant_id: int,
+    include_sports: bool = Query(False, description="Include sports mappings in response"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get a tenant by ID."""
-    result = await tenant_service.get_tenant(db=db, tenant_id=tenant_id)
+    """
+    Get a tenant by ID.
+    
+    Query Parameters:
+    - include_sports: If True, includes sports mappings in the response (default: false)
+    """
+    result = await tenant_service.get_tenant(
+        db=db,
+        tenant_id=tenant_id,
+        include_sports=include_sports
+    )
     return FormatResponse.success(
         data=result,
         msg="Tenant retrieved successfully"
@@ -159,5 +177,89 @@ async def delete_tenant(
     return FormatResponse.success(
         data=result,
         msg=f"Tenant {delete_type} successfully"
+    )
+
+
+# Tenant Sports Mapping Endpoints
+
+@router.post(
+    "/{tenant_id}/sports",
+    response_model=StandardResponse[List[TenantSportsMappingResponse]],
+    status_code=status.HTTP_201_CREATED,
+    summary="Register sports under tenant",
+    description="Register one or more sports under a tenant. Validates that both tenant and all sports exist."
+)
+async def register_sports(
+    tenant_id: int,
+    request: BulkRegisterSportRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Register multiple sports under a tenant in a single operation.
+    
+    Validates:
+    - Tenant exists and is not deleted
+    - All sports exist and are not deleted
+    - No mappings already exist for any of the sports
+    
+    Request Body:
+    - sports: List of sport objects to register (required, min: 1)
+      - sport_id: Sport ID to register (required)
+      - desciption: Mapping description (optional)
+    - created_by: User ID who created the mappings (optional, default: 1)
+    
+    Returns:
+    - List of created TenantSportsMapping objects
+    """
+    result = await tenant_sports_mapping_service.bulk_register_sports(
+        db=db,
+        tenant_id=tenant_id,
+        request=request
+    )
+    return FormatResponse.created(
+        data=result,
+        msg=f"{len(result)} sport(s) registered successfully for tenant {tenant_id}"
+    )
+
+
+@router.put(
+    "/{tenant_id}/sports/{sport_id}",
+    response_model=StandardResponse[TenantSportsMappingResponse],
+    summary="Update/unregister sport mapping",
+    description="Update a sport mapping for a tenant. Can be used to unregister by setting status to INACTIVE."
+)
+async def update_sport_mapping(
+    tenant_id: int,
+    sport_id: int,
+    mapping_in: TenantSportsMappingUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a sport mapping for a tenant.
+    
+    Can be used to:
+    - Update mapping status (e.g., set to INACTIVE to unregister)
+    - Update mapping description
+    - Update updated_by field
+    
+    Validates:
+    - Tenant exists and is not deleted
+    - Sport exists and is not deleted
+    - Mapping exists
+    
+    Request Body (all fields optional):
+    - status: Mapping status (optional)
+    - desciption: Mapping description (optional)
+    - updated_by: User ID who updated the mapping (optional)
+    """
+    result = await tenant_sports_mapping_service.update_mapping_by_tenant_sport(
+        db=db,
+        tenant_id=tenant_id,
+        sport_id=sport_id,
+        mapping_in=mapping_in
+    )
+    return FormatResponse.success(
+        data=result,
+        msg=f"Sport mapping updated successfully for tenant {tenant_id}"
     )
 
