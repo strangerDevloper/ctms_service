@@ -75,6 +75,46 @@ class CRUDSport(CRUDBase[Sport, SportCreate, SportUpdate]):
         result = await db.execute(query)
         return list(result.scalars().all())
     
+    async def validate_sports_exist(
+        self,
+        db: AsyncSession,
+        *,
+        sport_ids: List[int]
+    ) -> Tuple[List[int], List[int]]:
+        """
+        Validate that multiple sports exist and are not deleted.
+        
+        Args:
+            db: Database session
+            sport_ids: List of sport IDs to validate
+            
+        Returns:
+            Tuple of (valid_sport_ids, invalid_sport_ids)
+            - valid_sport_ids: List of sport IDs that exist and are not deleted
+            - invalid_sport_ids: List of sport IDs that don't exist or are deleted
+        """
+        if not sport_ids:
+            return [], []
+        
+        # Query all sports at once
+        query = select(Sport.id, Sport.is_deleted).filter(Sport.id.in_(sport_ids))
+        result = await db.execute(query)
+        sport_rows = result.all()
+        
+        # Create sets for comparison
+        valid_sport_ids = {row[0] for row in sport_rows if not row[1]}  # Not deleted
+        all_found_ids = {row[0] for row in sport_rows}
+        
+        # Find invalid IDs (not found or deleted)
+        invalid_sport_ids = []
+        for sport_id in sport_ids:
+            if sport_id not in all_found_ids:
+                invalid_sport_ids.append(sport_id)
+            elif sport_id not in valid_sport_ids:
+                invalid_sport_ids.append(sport_id)
+        
+        return list(valid_sport_ids), invalid_sport_ids
+    
     async def get_multi(
         self,
         db: AsyncSession,

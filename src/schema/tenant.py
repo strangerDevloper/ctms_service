@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, validator
 from uuid import UUID
@@ -65,6 +65,14 @@ class TenantResponse(TenantInDB):
     pass
 
 
+class TenantWithSportsResponse(TenantInDB):
+    """Schema for tenant API response with sports mappings included."""
+    sports_mappings: Optional[List] = Field(default=None, description="List of sports mappings")
+    
+    class Config:
+        from_attributes = True
+
+
 class TenantListResponse(BaseModel):
     """Simplified schema for tenant list response with only essential fields."""
     id: int
@@ -84,6 +92,7 @@ class TenantQueryParams(BaseModel):
     search_id: Optional[int] = Field(default=None, description="Search by tenant ID")
     search: Optional[str] = Field(default=None, description="Search by tenant name or code (case-insensitive partial match)")
     include_deleted: bool = Field(default=False, description="Include soft-deleted tenants")
+    sports_id: Optional[int] = Field(default=None, description="Filter tenants by sport ID (joins with tenant_sports_mapping)")
     
     class Config:
         from_attributes = True
