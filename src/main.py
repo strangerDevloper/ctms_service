@@ -1,12 +1,26 @@
+import os
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
 from src.database import Base, engine
 from src.router import tenant, sports
+from src.middleware.profiling import ProfilingMiddleware
+
+# Load environment variables
+load_dotenv()
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CTMS API", version="1.0.0")
+
+# Add profiling middleware (similar to Morgan in Node.js)
+# Enable/disable via ENABLE_PROFILING env variable (default: true)
+# Log format via PROFILE_LOG_FORMAT env variable (default: "combined")
+enable_profiling = os.getenv("ENABLE_PROFILING", "False").lower() == "true"
+if enable_profiling:
+    log_format = os.getenv("PROFILE_LOG_FORMAT", "combined")
+    app.add_middleware(ProfilingMiddleware, log_format=log_format)
 
 # Include routers
 app.include_router(tenant.router)
