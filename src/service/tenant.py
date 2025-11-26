@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID, uuid4
 from src.crud.tenant import tenant as crud_tenant
 from src.models.tenants import Tenant, TenantStatus
-from src.schema.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantQueryParams
+from src.schema.tenant import TenantCreate, TenantUpdate, TenantResponse, TenantListResponse, TenantQueryParams
+from src.utils.response import PaginatedData
 
 
 class TenantService:
@@ -45,7 +46,7 @@ class TenantService:
     async def get_tenants(
         db: AsyncSession,
         query_params: TenantQueryParams
-    ) -> List[Tenant]:
+    ) -> PaginatedData[TenantListResponse]:
         """
         Get multiple tenants with pagination and filters.
         
@@ -54,11 +55,25 @@ class TenantService:
             query_params: Query parameters object containing filters and pagination
             
         Returns:
-            List of Tenant objects
+            PaginatedData containing list of TenantListResponse objects, total count, and pagination info
         """
-        return await crud_tenant.get_multi(
+        items, total_count = await crud_tenant.get_multi(
             db=db,
             query_params=query_params
+        )
+        
+        # Convert SQLAlchemy models to Pydantic models
+        tenant_list = [TenantListResponse.model_validate(tenant) for tenant in items]
+        
+        # Calculate has_next_page
+        has_next_page = (query_params.skip + query_params.limit) < total_count
+        
+        return PaginatedData(
+            items=tenant_list,
+            total_count=total_count,
+            has_next_page=has_next_page,
+            skip=query_params.skip,
+            limit=query_params.limit
         )
     
     @staticmethod
