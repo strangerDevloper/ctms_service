@@ -5,6 +5,9 @@ alembic==1.12.1
 python-dotenv==1.0.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
+email-validator==2.1.0  # Required for Pydantic EmailStr validation
+greenlet==3.0.3  # Required for SQLAlchemy async operations
 
 # Database drivers (install based on your database)
-psycopg2-binary==2.9.9  # For PostgreSQL
+psycopg2-binary==2.9.9  # For PostgreSQL (sync)
+asyncpg==0.29.0  # For PostgreSQL async support
