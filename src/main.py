@@ -1,5 +1,6 @@
 import os
 from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from src.database import Base, engine
@@ -42,3 +43,12 @@ def health_check():
     """
     return JSONResponse(content={"status": "healthy"})
 
+origins = ["http://localhost:4200","http://20.56.90.56:8030","http://20.56.90.56:8035"]
+# origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
